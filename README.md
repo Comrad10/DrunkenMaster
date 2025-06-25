@@ -206,6 +206,138 @@ lcbo_crawler/
 └── README.md              # This file
 ```
 
+## How It Works
+
+### System Architecture
+
+The DrunkenMaster system is built with a modular architecture that separates concerns into distinct layers:
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   CLI Interface │    │  Recipe Engine  │    │  Web Crawler    │
+│    (main.py)    │◄──►│   (services/)   │◄──►│  (crawlers/)    │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                       │                       │
+         ▼                       ▼                       ▼
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│    Database     │    │ Product Matcher │    │   Data Parser   │
+│   (models/)     │◄──►│   Algorithm     │◄──►│   (parsers/)    │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+```
+
+### Core Components
+
+#### 1. Web Crawler (`src/crawlers/`)
+**How it works:**
+- **Reverse Engineering**: Analyzes LCBO's website to discover their internal Coveo search API
+- **Respectful Crawling**: Uses 2-5 second delays and avoids peak hours (5-8 PM)
+- **Playwright Automation**: Controls a headless Chrome browser to handle JavaScript-rendered content
+- **Error Handling**: Implements retry logic and circuit breakers for network failures
+
+**Key Files:**
+- `api_investigator.py` - Discovers API endpoints and parameters
+- `product_crawler.py` - Extracts product data from search results
+- `store_locator.py` - Finds store locations and IDs
+- `store_inventory_crawler.py` - Checks product availability at specific stores
+
+#### 2. Recipe Engine (`src/services/`)
+**How it works:**
+- **Recipe Database**: Stores 47+ cocktail recipes with detailed ingredient specifications
+- **Product Matching**: Uses a scoring algorithm to match recipe ingredients to LCBO products
+- **Cost Calculation**: Computes exact costs including bottle prices, amounts used, and profit margins
+- **Sale Detection**: Identifies products on sale and calculates potential savings
+
+**Algorithm Details:**
+```python
+# Product Matching Score Calculation
+score = 0
++ exact_name_match * 100      # Highest priority
++ brand_preference * 50       # User specified brand
++ alcohol_type_match * 30     # Vodka matches "vodka" products
++ category_match * 20         # Spirits category match
++ ABV_sufficient * 10         # Meets minimum alcohol percentage
+- ABV_too_low * 20           # Penalty for insufficient alcohol
++ keyword_overlap * 5         # Individual word matches
++ price_range_bonus * 5       # Prefer mid-range products
+```
+
+#### 3. Database Schema (`src/models/`)
+**Core Tables:**
+- **Products**: LCBO product data with pricing and inventory
+- **Recipes**: Cocktail recipes with metadata
+- **RecipeIngredients**: Detailed ingredient specifications
+- **Stores**: LCBO store locations and information
+- **StoreInventory**: Product availability by store
+- **DrinkCostCalculations**: Historical cost calculations
+- **IngredientCosts**: Detailed cost breakdowns
+
+#### 4. Data Flow
+
+```
+1. User Request: "Calculate Old Fashioned cost"
+         ↓
+2. Recipe Lookup: Find "Old Fashioned" in database
+         ↓
+3. Ingredient Analysis: Extract required ingredients
+   - 60ml Bourbon Whiskey
+   - 10ml Simple Syrup  
+   - 2 dash Angostura Bitters
+         ↓
+4. Product Matching: For each alcohol ingredient
+   - Search LCBO database for matching products
+   - Score candidates using matching algorithm
+   - Select best option based on cost preference
+         ↓
+5. Cost Calculation:
+   - Alcohol: price_per_ml × amount_needed
+   - Mixers: predefined cost estimates
+   - Total: sum all ingredients
+         ↓
+6. Enhanced Display:
+   - Cost breakdown with bottle prices
+   - Store availability
+   - Sale detection
+   - Profit margin calculation (300% markup)
+```
+
+### Technical Implementation
+
+#### Web Scraping Strategy
+**Challenge**: LCBO uses a modern React SPA with dynamic content loading
+**Solution**: 
+- Reverse-engineered their Coveo search API endpoints
+- Bypassed the UI by making direct API calls
+- Handles pagination and filtering automatically
+
+#### Product Matching Intelligence
+**Challenge**: Recipe ingredients like "Bourbon Whiskey" need to match specific LCBO products
+**Solution**:
+- Multi-tier scoring system with exact matches, brand preferences, and keyword analysis
+- Handles variations ("whiskey" vs "whisky", "triple sec" vs "orange liqueur")
+- Provides price range options (cheapest, mid-range, premium)
+
+#### Store Integration
+**Challenge**: Track inventory across multiple store locations
+**Solution**:
+- Automated store discovery for St. Catharines area (found 5 stores)
+- Real-time availability checking through LCBO's inventory API
+- Geographic filtering for relevant locations
+
+### Performance Optimizations
+
+1. **Database Indexing**: Strategic indexes on frequently queried fields
+2. **Session Management**: Proper SQLAlchemy session handling with connection pooling
+3. **Caching**: Stores API responses to reduce redundant requests
+4. **Batch Processing**: Groups multiple operations for better performance
+5. **Rate Limiting**: Prevents overwhelming LCBO's servers
+
+### Error Handling & Reliability
+
+- **Circuit Breaker Pattern**: Stops making requests if error rate exceeds threshold
+- **Exponential Backoff**: Gradually increases delay between retry attempts  
+- **Session Recovery**: Handles database connection issues gracefully
+- **Graceful Degradation**: System continues working even if some components fail
+
 ## Development
 
 ### Running Tests
