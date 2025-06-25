@@ -392,6 +392,14 @@ Enable verbose logging:
 python main.py --verbose [command]
 ```
 
+## Development Philosophy
+
+This project was built using an iterative, user-driven approach called "vibe coding" - starting with curiosity and letting requirements emerge naturally through experimentation and feedback. 
+
+**📖 Read the full development story**: [DEVELOPMENT_PROCESS.md](DEVELOPMENT_PROCESS.md)
+
+Learn how this project evolved from "I wonder about drink costs" to a complete bar management system, and how you can apply the same approach to your own projects.
+
 ## Legal Considerations
 
 This tool is designed for personal use only:
